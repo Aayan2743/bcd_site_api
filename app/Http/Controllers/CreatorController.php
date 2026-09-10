@@ -6,93 +6,131 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
-
 class CreatorController extends Controller
 {
-     public function store(Request $request)
+    public function store(Request $request)
     {
+        /*
+        |--------------------------------------------------------------------------
+        | Validation
+        |--------------------------------------------------------------------------
+        */
+
         $validator = Validator::make($request->all(), [
 
-            'display_name' => 'required|string|max:60',
-            'tagline' => 'nullable|string|max:80',
-            'bio' => 'nullable|string|max:600',
-            'location' => 'nullable|string|max:255',
+            'display_name'             => 'required|string|max:60',
 
-            'categories' => 'nullable|array',
-            'categories.*' => 'string|max:100',
+            'tagline'                  => 'required|string|max:80',
 
-            'languages' => 'nullable|array',
-            'languages.*' => 'string|max:100',
+            'bio'                      => 'required|string|max:600',
 
-            'services' => 'nullable|string',
+            'location'                 => 'required|array',
+            'location.*'               => 'string|max:100',
 
-            'platforms' => 'nullable|array',
-            'platforms.*' => 'string|max:100',
+            'categories'               => 'required|array',
+            'categories.*'             => 'string|max:100',
 
-            'social_links' => 'nullable|array',
+            'languages'                => 'required|array',
+            'languages.*'              => 'string|max:100',
 
-            'social_links.instagram' => 'nullable|url',
-            'social_links.youtube' => 'nullable|url',
-            'social_links.facebook' => 'nullable|url',
-            'social_links.tiktok' => 'nullable|url',
-            'social_links.pinterest' => 'nullable|url',
+            'services'                 => 'required|array',
+            'services.*'               => 'string|max:100',
 
-            'instagram_url' => 'nullable|url',
+            'platforms'                => 'required|array',
+            'platforms.*'              => 'string|max:100',
 
-            'profile_photo' => [
+            'social_links'             => 'required|array',
+
+            'social_links.*.instagram' => 'required|string|max:1000',
+            'social_links.*.youtube'   => 'nullable|string|max:1000',
+            'social_links.*.facebook'  => 'nullable|string|max:1000',
+            'social_links.*.tiktok'    => 'nullable|string|max:1000',
+            'social_links.*.pinterest' => 'nullable|string|max:1000',
+
+            'instagram_url'            => 'required|url',
+
+            'profile_photo'            => [
                 'nullable',
                 'image',
                 'mimes:jpg,jpeg,png,webp',
-                'max:4096'
+                'max:4096',
             ],
 
-            'portfolio_images' => 'nullable|array|max:10',
+            'portfolio_images'         => 'required|array|max:10',
 
-            'portfolio_images.*' => [
+            'portfolio_images.*'       => [
                 'image',
                 'mimes:jpg,jpeg,png,webp',
-                'max:4096'
+                'max:4096',
             ],
 
-            'featured_reel_url' => 'nullable|url|max:1000',
+            'featured_reel_url'        => 'nullable|url|max:1000',
 
-            'follower_count' => 'nullable|integer|min:0',
-            'average_reach' => 'nullable|integer|min:0',
+            'average_reach'            => 'nullable|integer|min:0',
 
-            'show_follower_count' => 'nullable|boolean',
-            'show_average_reach' => 'nullable|boolean',
-            'show_enquiry_cta' => 'nullable|boolean',
+            'show_follower_count'      => 'nullable|boolean',
 
-            'is_published' => 'nullable|boolean',
-            'is_featured' => 'nullable|boolean',
+            'show_average_reach'       => 'nullable|boolean',
+
+            'show_enquiry_cta'         => 'nullable|boolean',
+
+            'is_published'             => 'nullable|boolean',
+
+            'is_featured'              => 'nullable|boolean',
         ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Validation Error
+        |--------------------------------------------------------------------------
+        */
 
         if ($validator->fails()) {
 
             return response()->json([
                 'success' => false,
-                'errors' => $validator->errors()->first(),
+                'errors'  => $validator->errors()->first(),
             ], 422);
-        }
-
-        $user = $request->user();
-
-        $existingCreator = Creator::where(
-            'user_id',
-            $user->id
-        )->first();
-
-        if ($existingCreator) {
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Creator profile already exists.',
-            ], 409);
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Profile photo
+        | Authenticated User
+        |--------------------------------------------------------------------------
+        */
+
+        $user = $request->user();
+
+        if (! $user) {
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Check Existing Creator
+        |--------------------------------------------------------------------------
+        */
+
+        // $existingCreator = Creator::where(
+        //     'user_id',
+        //     $user->id
+        // )->first();
+
+        // if ($existingCreator) {
+
+        //     return response()->json([
+        //         'success' => false,
+        //         'message' => 'Creator profile already exists.',
+        //     ], 409);
+        // }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Profile Photo
         |--------------------------------------------------------------------------
         */
 
@@ -100,13 +138,17 @@ class CreatorController extends Controller
 
         if ($request->hasFile('profile_photo')) {
 
-            $profilePhoto = $request->file('profile_photo')
-                ->store('creators/profile', 'public');
+            $profilePhoto = $request
+                ->file('profile_photo')
+                ->store(
+                    'creators/profile',
+                    'public'
+                );
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Portfolio images
+        | Portfolio Images
         |--------------------------------------------------------------------------
         */
 
@@ -114,69 +156,153 @@ class CreatorController extends Controller
 
         if ($request->hasFile('portfolio_images')) {
 
-            foreach ($request->file('portfolio_images') as $image) {
+            foreach (
+                $request->file('portfolio_images') as $image
+            ) {
 
                 $portfolioImages[] = $image
-                    ->store('creators/portfolio', 'public');
+                    ->store(
+                        'creators/portfolio',
+                        'public'
+                    );
             }
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Create
+        | Dummy Follower Count
+        |--------------------------------------------------------------------------
+        |
+        | Instagram count is not being fetched.
+        | This is a dummy value for testing.
+        |
+        */
+
+        $followerCount = 42;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Create Creator
         |--------------------------------------------------------------------------
         */
 
         $creator = Creator::create([
 
-            'user_id' => $user->id,
+            'user_id'             => $user->id,
 
-            'display_name' => $request->display_name,
-            'tagline' => $request->tagline,
-            'bio' => $request->bio,
-            'location' => $request->location,
+            'display_name'        =>
+            $request->display_name,
 
-            'categories' => $request->categories,
-            'languages' => $request->languages,
+            'tagline'             =>
+            $request->tagline,
 
-            'services' => $request->services,
+            'bio'                 =>
+            $request->bio,
 
-            'platforms' => $request->platforms,
-            'social_links' => $request->social_links,
+            'location'            =>
+            $request->location,
 
-            'instagram_url' => $request->instagram_url,
+            'categories'          =>
+            $request->categories,
 
-            'profile_photo' => $profilePhoto,
-            'portfolio_images' => $portfolioImages,
+            'languages'           =>
+            $request->languages,
 
-            'featured_reel_url' => $request->featured_reel_url,
+            'services'            =>
+            $request->services,
 
-            'follower_count' => $request->follower_count ?? 0,
-            'average_reach' => $request->average_reach ?? 0,
+            'platforms'           =>
+            $request->platforms,
+
+            'social_links'        =>
+            $request->social_links,
+
+            'instagram_url'       =>
+            $request->instagram_url,
+
+            'profile_photo'       =>
+            $profilePhoto,
+
+            'portfolio_images'    =>
+            $portfolioImages,
+
+            'featured_reel_url'   =>
+            $request->featured_reel_url,
+
+            /*
+            |--------------------------------------------------------------------------
+            | Dummy Instagram Followers
+            |--------------------------------------------------------------------------
+            */
+
+            'follower_count'      =>
+            $followerCount,
+
+            /*
+            |--------------------------------------------------------------------------
+            | Average Reach
+            |--------------------------------------------------------------------------
+            */
+
+            'average_reach'       =>
+            $request->average_reach ?? 0,
+
+            /*
+            |--------------------------------------------------------------------------
+            | Visibility Settings
+            |--------------------------------------------------------------------------
+            */
 
             'show_follower_count' =>
-                $request->boolean('show_follower_count'),
+            $request->boolean(
+                'show_follower_count'
+            ),
 
-            'show_average_reach' =>
-                $request->boolean('show_average_reach'),
+            'show_average_reach'  =>
+            $request->boolean(
+                'show_average_reach'
+            ),
 
-            'show_enquiry_cta' =>
-                $request->boolean('show_enquiry_cta'),
+            'show_enquiry_cta'    =>
+            $request->boolean(
+                'show_enquiry_cta'
+            ),
 
-            'is_published' =>
-                $request->boolean('is_published'),
+            /*
+            |--------------------------------------------------------------------------
+            | Publish Settings
+            |--------------------------------------------------------------------------
+            */
 
-            'is_featured' =>
-                $request->boolean('is_featured'),
+            'is_published'        =>
+            $request->boolean(
+                'is_published'
+            ),
+
+            'is_featured'         =>
+            $request->boolean(
+                'is_featured'
+            ),
         ]);
 
+        /*
+        |--------------------------------------------------------------------------
+        | Response
+        |--------------------------------------------------------------------------
+        */
+
         return response()->json([
+
             'success' => true,
-            'message' => 'Creator profile created successfully.',
-            'data' => $this->formatCreator($creator),
+
+            'message' =>
+            'Creator profile created successfully.',
+
+            'data'    =>
+            $this->formatCreator($creator),
+
         ], 201);
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -191,7 +317,7 @@ class CreatorController extends Controller
             $request->user()->id
         )->first();
 
-        if (!$creator) {
+        if (! $creator) {
 
             return response()->json([
                 'success' => false,
@@ -201,10 +327,9 @@ class CreatorController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $this->formatCreator($creator),
+            'data'    => $this->formatCreator($creator),
         ]);
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -212,14 +337,14 @@ class CreatorController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function update(Request $request)
+    public function update(Request $request, $id)
     {
         $creator = Creator::where(
-            'user_id',
-            $request->user()->id
+            'id',
+            $id
         )->first();
 
-        if (!$creator) {
+        if (! $creator) {
 
             return response()->json([
                 'success' => false,
@@ -229,61 +354,61 @@ class CreatorController extends Controller
 
         $validator = Validator::make($request->all(), [
 
-            'display_name' => 'required|string|max:60',
-            'tagline' => 'nullable|string|max:80',
-            'bio' => 'nullable|string|max:600',
-            'location' => 'nullable|string|max:255',
+            'display_name'           => 'required|string|max:60',
+            'tagline'                => 'required|string|max:80',
+            'bio'                    => 'required|string|max:600',
+            'location'               => 'required|array',
 
-            'categories' => 'nullable|array',
-            'languages' => 'nullable|array',
+            'categories'             => 'required|array',
+            'languages'              => 'required|array',
 
-            'services' => 'nullable|string',
+            'services'               => 'required|string',
 
-            'platforms' => 'nullable|array',
+            'platforms'              => 'required|array',
 
-            'social_links' => 'nullable|array',
+            'social_links'           => 'required|array',
 
-            'social_links.instagram' => 'nullable|url',
-            'social_links.youtube' => 'nullable|url',
-            'social_links.facebook' => 'nullable|url',
-            'social_links.tiktok' => 'nullable|url',
-            'social_links.pinterest' => 'nullable|url',
+            'social_links.instagram' => 'required|url',
+            'social_links.youtube'   => 'required|url',
+            'social_links.facebook'  => 'required|url',
+            'social_links.tiktok'    => 'required|url',
+            'social_links.pinterest' => 'required|url',
 
-            'instagram_url' => 'nullable|url',
+            'instagram_url'          => 'required|url',
 
-            'profile_photo' => [
+            'profile_photo'          => [
                 'nullable',
                 'image',
                 'mimes:jpg,jpeg,png,webp',
-                'max:4096'
+                'max:4096',
             ],
 
-            'portfolio_images' => 'nullable|array|max:10',
+            'portfolio_images'       => 'required|array|max:10',
 
-            'portfolio_images.*' => [
+            'portfolio_images.*'     => [
                 'image',
                 'mimes:jpg,jpeg,png,webp',
-                'max:4096'
+                'max:4096',
             ],
 
-            'featured_reel_url' => 'nullable|url|max:1000',
+            'featured_reel_url'      => 'required|url|max:1000',
 
-            'follower_count' => 'nullable|integer|min:0',
-            'average_reach' => 'nullable|integer|min:0',
+            'follower_count'         => 'required|integer|min:0',
+            'average_reach'          => 'required|integer|min:0',
 
-            'show_follower_count' => 'nullable|boolean',
-            'show_average_reach' => 'nullable|boolean',
-            'show_enquiry_cta' => 'nullable|boolean',
+            'show_follower_count'    => 'required|boolean',
+            'show_average_reach'     => 'required|boolean',
+            'show_enquiry_cta'       => 'required|boolean',
 
-            'is_published' => 'nullable|boolean',
-            'is_featured' => 'nullable|boolean',
+            'is_published'           => 'required|boolean',
+            'is_featured'            => 'required|boolean',
         ]);
 
         if ($validator->fails()) {
 
             return response()->json([
                 'success' => false,
-                'errors' => $validator->errors()->first(),
+                'errors'  => $validator->errors()->first(),
             ], 422);
         }
 
@@ -298,15 +423,15 @@ class CreatorController extends Controller
             if (
                 $creator->profile_photo &&
                 Storage::disk('public')
-                    ->exists($creator->profile_photo)
+                ->exists($creator->profile_photo)
             ) {
                 Storage::disk('public')
                     ->delete($creator->profile_photo);
             }
 
             $creator->profile_photo =
-                $request->file('profile_photo')
-                    ->store('creators/profile', 'public');
+            $request->file('profile_photo')
+                ->store('creators/profile', 'public');
         }
 
         /*
@@ -325,7 +450,7 @@ class CreatorController extends Controller
 
                     if (
                         Storage::disk('public')
-                            ->exists($oldImage)
+                        ->exists($oldImage)
                     ) {
                         Storage::disk('public')
                             ->delete($oldImage);
@@ -336,15 +461,14 @@ class CreatorController extends Controller
             $portfolioImages = [];
 
             foreach (
-                $request->file('portfolio_images')
-                as $image
+                $request->file('portfolio_images') as $image
             ) {
 
                 $portfolioImages[] =
-                    $image->store(
-                        'creators/portfolio',
-                        'public'
-                    );
+                $image->store(
+                    'creators/portfolio',
+                    'public'
+                );
             }
 
             $creator->portfolio_images = $portfolioImages;
@@ -357,54 +481,53 @@ class CreatorController extends Controller
         */
 
         $creator->display_name = $request->display_name;
-        $creator->tagline = $request->tagline;
-        $creator->bio = $request->bio;
-        $creator->location = $request->location;
+        $creator->tagline      = $request->tagline;
+        $creator->bio          = $request->bio;
+        $creator->location     = $request->location;
 
         $creator->categories = $request->categories;
-        $creator->languages = $request->languages;
+        $creator->languages  = $request->languages;
 
         $creator->services = $request->services;
 
-        $creator->platforms = $request->platforms;
+        $creator->platforms    = $request->platforms;
         $creator->social_links = $request->social_links;
 
         $creator->instagram_url =
-            $request->instagram_url;
+        $request->instagram_url;
 
         $creator->featured_reel_url =
-            $request->featured_reel_url;
+        $request->featured_reel_url;
 
         $creator->follower_count =
-            $request->follower_count ?? 0;
+        $request->follower_count ?? 0;
 
         $creator->average_reach =
-            $request->average_reach ?? 0;
+        $request->average_reach ?? 0;
 
         $creator->show_follower_count =
-            $request->boolean('show_follower_count');
+        $request->boolean('show_follower_count');
 
         $creator->show_average_reach =
-            $request->boolean('show_average_reach');
+        $request->boolean('show_average_reach');
 
         $creator->show_enquiry_cta =
-            $request->boolean('show_enquiry_cta');
+        $request->boolean('show_enquiry_cta');
 
         $creator->is_published =
-            $request->boolean('is_published');
+        $request->boolean('is_published');
 
         $creator->is_featured =
-            $request->boolean('is_featured');
+        $request->boolean('is_featured');
 
         $creator->save();
 
         return response()->json([
             'success' => true,
             'message' => 'Creator profile updated successfully.',
-            'data' => $this->formatCreator($creator),
+            'data'    => $this->formatCreator($creator),
         ]);
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -412,14 +535,14 @@ class CreatorController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function destroy(Request $request)
+    public function destroy(Request $request, $id)
     {
         $creator = Creator::where(
-            'user_id',
-            $request->user()->id
+            'id',
+            $id
         )->first();
 
-        if (!$creator) {
+        if (! $creator) {
 
             return response()->json([
                 'success' => false,
@@ -434,7 +557,7 @@ class CreatorController extends Controller
         if (
             $creator->profile_photo &&
             Storage::disk('public')
-                ->exists($creator->profile_photo)
+            ->exists($creator->profile_photo)
         ) {
 
             Storage::disk('public')
@@ -453,7 +576,7 @@ class CreatorController extends Controller
 
                 if (
                     Storage::disk('public')
-                        ->exists($image)
+                    ->exists($image)
                 ) {
 
                     Storage::disk('public')
@@ -470,21 +593,20 @@ class CreatorController extends Controller
         ]);
     }
 
-
     /*
     |--------------------------------------------------------------------------
     | TOGGLE PUBLISH
     |--------------------------------------------------------------------------
     */
 
-    public function togglePublish(Request $request)
+    public function togglePublish(Request $request, $id)
     {
         $creator = Creator::where(
-            'user_id',
-            $request->user()->id
+            'id',
+            $id
         )->first();
 
-        if (!$creator) {
+        if (! $creator) {
 
             return response()->json([
                 'success' => false,
@@ -493,7 +615,7 @@ class CreatorController extends Controller
         }
 
         $creator->is_published =
-            !$creator->is_published;
+        ! $creator->is_published;
 
         $creator->save();
 
@@ -502,13 +624,12 @@ class CreatorController extends Controller
             'message' => $creator->is_published
                 ? 'Creator published successfully.'
                 : 'Creator unpublished successfully.',
-            'data' => [
-                'id' => $creator->id,
+            'data'    => [
+                'id'           => $creator->id,
                 'is_published' => $creator->is_published,
             ],
         ]);
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -516,14 +637,14 @@ class CreatorController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function toggleFeatured(Request $request)
+    public function toggleFeatured(Request $request, $id)
     {
         $creator = Creator::where(
-            'user_id',
-            $request->user()->id
+            'id',
+            $id
         )->first();
 
-        if (!$creator) {
+        if (! $creator) {
 
             return response()->json([
                 'success' => false,
@@ -532,7 +653,7 @@ class CreatorController extends Controller
         }
 
         $creator->is_featured =
-            !$creator->is_featured;
+        ! $creator->is_featured;
 
         $creator->save();
 
@@ -541,13 +662,12 @@ class CreatorController extends Controller
             'message' => $creator->is_featured
                 ? 'Creator marked as featured.'
                 : 'Creator removed from featured.',
-            'data' => [
-                'id' => $creator->id,
+            'data'    => [
+                'id'          => $creator->id,
                 'is_featured' => $creator->is_featured,
             ],
         ]);
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -561,33 +681,33 @@ class CreatorController extends Controller
 
             $creator->profile_photo =
                 asset(
-                    'storage/' .
-                    $creator->profile_photo
-                );
+                'storage/' .
+                $creator->profile_photo
+            );
         }
 
         if ($creator->instagram_profile_image) {
 
             $creator->instagram_profile_image =
                 asset(
-                    'storage/' .
-                    $creator->instagram_profile_image
-                );
+                'storage/' .
+                $creator->instagram_profile_image
+            );
         }
 
         if ($creator->portfolio_images) {
 
             $creator->portfolio_images =
-                collect($creator->portfolio_images)
-                    ->map(function ($image) {
+            collect($creator->portfolio_images)
+                ->map(function ($image) {
 
-                        return asset(
-                            'storage/' . $image
-                        );
+                    return asset(
+                        'storage/' . $image
+                    );
 
-                    })
-                    ->values()
-                    ->toArray();
+                })
+                ->values()
+                ->toArray();
         }
 
         return $creator;

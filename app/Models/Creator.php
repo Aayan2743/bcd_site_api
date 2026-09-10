@@ -36,9 +36,11 @@ class Creator extends Model
     ];
 
     protected $casts = [
+
         'categories'          => 'array',
-        'location'           => 'array',
+        'location'            => 'array',
         'languages'           => 'array',
+        'services'            => 'array',
         'platforms'           => 'array',
         'social_links'        => 'array',
         'portfolio_images'    => 'array',
