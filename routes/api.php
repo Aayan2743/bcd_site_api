@@ -65,8 +65,10 @@ Route::prefix('admin')->middleware(['api', 'jwt.auth'])->group(function () {
     Route::delete('/posts/{id}', [PostController::class, 'destroy']);
     Route::patch('/posts/{id}/publish', [PostController::class, 'togglePublish']);
     Route::patch('/posts/{id}/featured', [PostController::class, 'toggleFeatured']);
+    Route::get('/creators', [CreatorController::class, 'index']);
     Route::post('/creator', [CreatorController::class, 'store']);
-    Route::get('/creator/profile', [CreatorController::class, 'profile']);
+    // Route::get('/creator/profile', [CreatorController::class, 'profile']);
+    Route::get('/creators/{id}', [CreatorController::class, 'show']);
     Route::post('/creator/update/{id}', [CreatorController::class, 'update']);
     Route::delete('/creator/{id}', [CreatorController::class, 'destroy']);
     Route::patch('/creator/toggle-publish/{id}', [CreatorController::class, 'togglePublish']);
