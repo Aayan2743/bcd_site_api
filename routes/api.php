@@ -10,7 +10,9 @@ use App\Http\Controllers\PostController;
 
 Route::prefix('/public')->group(function () {
 
-    Route::post('instagram-profile', [InstagramController::class, 'profile']);
+    Route::post('/creator/scrape-instagram', [InstagramController::class, 'scrapeInstagram']);
+
+    Route::post('instagram-profile', [InstagramController::class, 'scrapeInstagram']);
 
     // ================= SETTINGS =================
     // Route::get('/settings/brand/', [BrandingController::class, 'show']);

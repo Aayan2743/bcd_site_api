@@ -1,16 +1,16 @@
 <?php
 namespace App\Http\Controllers;
 
+// use App\Services\InstagramScraperService;
 use App\Services\InstagramScraperService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class InstagramController extends Controller
 {
-    public function profile(
-        Request $request,
-        InstagramScraperService $instagram
-    ) {
+
+    public function scrapeInstagram(Request $request, InstagramScraperService $instagramScraper)
+    {
         $validator = Validator::make($request->all(), [
             'instagram_url' => 'required|url',
         ]);
@@ -18,29 +18,26 @@ class InstagramController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => $validator->errors()->first(),
+                'errors'  => $validator->errors(),
             ], 422);
         }
 
         try {
-
-            $data = $instagram->scrape(
+            $data = $instagramScraper->scrape(
                 $request->instagram_url
             );
 
             return response()->json([
                 'success' => true,
-                'message' => 'Instagram profile fetched successfully.',
+                'message' => 'Instagram profile scraped successfully.',
                 'data'    => $data,
-            ]);
-
+            ], 200);
         } catch (\Throwable $e) {
-
             return response()->json([
                 'success' => false,
-                'message' => 'Unable to fetch Instagram profile.',
-                'error'   => $e->getMessage(),
-            ], 422);
+                'message' => $e->getMessage(),
+            ], 500);
         }
     }
+
 }

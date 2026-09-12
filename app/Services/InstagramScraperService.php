@@ -6,11 +6,11 @@ use Symfony\Component\Panther\Client;
 
 class InstagramScraperService
 {
-    public function scrape(string $url): array
+  public function scrape(string $url): array
     {
         $username = $this->extractUsername($url);
 
-        if (! $username) {
+        if (!$username) {
             throw new \Exception('Invalid Instagram profile URL.');
         }
 
@@ -20,174 +20,55 @@ class InstagramScraperService
 
         $client->request('GET', $profileUrl);
 
-        // Wait for Instagram page to render
         $client->waitFor('body', 10);
 
-        // Give JS a little time to populate the page
-        usleep(2000000);
+        sleep(3);
+
+        $this->closePopup($client);
+
+        sleep(2);
 
         $crawler = $client->getCrawler();
 
-        /*
-        |--------------------------------------------------------------------------
-        | Username
-        |--------------------------------------------------------------------------
-        */
-
-        $profileUsername = $username;
-
-        /*
-        |--------------------------------------------------------------------------
-        | Profile Image
-        |--------------------------------------------------------------------------
-        */
-
-        $profileImage = null;
-
-        $ogImage = $crawler->filter(
-            'meta[property="og:image"]'
-        );
-
-        if ($ogImage->count()) {
-            $profileImage = $ogImage->attr('content');
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Meta Description
-        |--------------------------------------------------------------------------
-        */
-
-        $description = null;
-
-        $metaDescription = $crawler->filter(
-            'meta[property="og:description"]'
-        );
-
-        if ($metaDescription->count()) {
-            $description = $metaDescription->attr('content');
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Page Text
-        |--------------------------------------------------------------------------
-        */
-
-        $bodyText = $crawler->filter('body')->text();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Followers
-        |--------------------------------------------------------------------------
-        */
-
-        $followers = null;
-
-        if (
-            preg_match(
-                '/([\d,.]+(?:\s*[KMB])?)\s+followers/i',
-                $bodyText,
-                $matches
-            )
-        ) {
-            $followers = $this->convertNumber(
-                $matches[1]
-            );
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Following
-        |--------------------------------------------------------------------------
-        */
-
-        $following = null;
-
-        if (
-            preg_match(
-                '/([\d,.]+(?:\s*[KMB])?)\s+following/i',
-                $bodyText,
-                $matches
-            )
-        ) {
-            $following = $this->convertNumber(
-                $matches[1]
-            );
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Name
-        |--------------------------------------------------------------------------
-        */
-
-        $name = null;
-
-        /*
-         * Try profile heading / accessible elements first.
-         */
-        $crawler->filter('h1')->each(
-            function (Crawler $node) use (&$name) {
-
-                if (! $name) {
-                    $text = trim($node->text());
-
-                    if ($text !== '') {
-                        $name = $text;
-                    }
-                }
-            }
-        );
-
-        /*
-        |--------------------------------------------------------------------------
-        | Return
-        |--------------------------------------------------------------------------
-        */
-
-        return [
-            'username'      => $profileUsername,
-            'profile_url'   => $profileUrl,
-            'name'          => $name,
-            'followers'     => $followers,
-            'following'     => $following,
-            'profile_image' => $profileImage,
-            'description'   => $description,
+        $data = [
+            'username' => $username,
+            'profile_url' => $profileUrl,
+            'name' => $this->getName($crawler),
+            'followers' => $this->getFollowers($crawler),
+            'following' => $this->getFollowing($crawler),
+            'profile_image' => $this->getMetaContent($crawler, 'og:image'),
+            'description' => $this->getMetaContent($crawler, 'og:description'),
         ];
+
+        $client->quit();
+
+        return $data;
     }
 
     private function extractUsername(string $url): ?string
     {
-        if (! filter_var($url, FILTER_VALIDATE_URL)) {
+        if (!filter_var($url, FILTER_VALIDATE_URL)) {
             return null;
         }
 
-        $host = strtolower(
-            parse_url($url, PHP_URL_HOST)
-        );
+        $host = strtolower(parse_url($url, PHP_URL_HOST));
 
-        if (
-            $host !== 'instagram.com' &&
-            $host !== 'www.instagram.com'
-        ) {
+        if (!in_array($host, [
+            'instagram.com',
+            'www.instagram.com',
+        ])) {
             return null;
         }
 
         $path = parse_url($url, PHP_URL_PATH);
 
-        if (! $path) {
+        if (!$path) {
             return null;
         }
 
-        $username = trim($path, '/');
+        $username = explode('/', trim($path, '/'))[0] ?? null;
 
-        /*
-         * Only first URL segment
-         */
-        $username = explode('/', $username)[0];
-
-        if (! $username) {
+        if (!$username) {
             return null;
         }
 
@@ -208,6 +89,121 @@ class InstagramScraperService
         }
 
         return $username;
+    }
+
+    private function closePopup(Client $client): void
+    {
+        try {
+            $client->executeScript("
+                const buttons = document.querySelectorAll('button');
+
+                for (const button of buttons) {
+                    const aria = button.getAttribute('aria-label');
+
+                    if (aria && aria.toLowerCase() === 'close') {
+                        button.click();
+                        break;
+                    }
+                }
+            ");
+
+            sleep(1);
+        } catch (\Throwable $e) {
+        }
+    }
+
+    private function getName(Crawler $crawler): ?string
+    {
+        try {
+            $name = null;
+
+            $crawler->filter('h1')->each(
+                function (Crawler $node) use (&$name) {
+                    if ($name) {
+                        return;
+                    }
+
+                    $text = trim($node->text());
+
+                    if ($text !== '') {
+                        $name = $text;
+                    }
+                }
+            );
+
+            return $name;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private function getFollowers(Crawler $crawler): int
+    {
+        try {
+            $followers = null;
+
+            $crawler->filter('span[title]')->each(
+                function (Crawler $node) use (&$followers) {
+                    if ($followers !== null) {
+                        return;
+                    }
+
+                    $title = trim((string) $node->attr('title'));
+                    $text = trim($node->text());
+
+                    if ($title !== '' && preg_match('/^[\d,.]+(?:\s*[KMB])?$/i', $title)) {
+                        $followers = $this->convertNumber($title);
+                        return;
+                    }
+
+                    if ($text !== '' && preg_match('/^[\d,.]+(?:\s*[KMB])?$/i', $text)) {
+                        $followers = $this->convertNumber($text);
+                    }
+                }
+            );
+
+            return $followers ?? 0;
+        } catch (\Throwable $e) {
+            return 0;
+        }
+    }
+
+    private function getFollowing(Crawler $crawler): int
+    {
+        try {
+            $bodyText = $crawler->filter('body')->text();
+
+            if (preg_match(
+                '/([\d,.]+(?:\s*[KMB])?)\s+following/i',
+                $bodyText,
+                $matches
+            )) {
+                return $this->convertNumber($matches[1]);
+            }
+
+            return 0;
+        } catch (\Throwable $e) {
+            return 0;
+        }
+    }
+
+    private function getMetaContent(
+        Crawler $crawler,
+        string $property
+    ): ?string {
+        try {
+            $node = $crawler->filter(
+                'meta[property="' . $property . '"]'
+            );
+
+            if ($node->count()) {
+                return $node->attr('content');
+            }
+
+            return null;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     private function convertNumber(string $value): int
