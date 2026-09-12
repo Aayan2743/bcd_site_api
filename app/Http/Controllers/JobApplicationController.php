@@ -3,7 +3,7 @@ namespace App\Http\Controllers;
 
 use App\Mail\JobApplicationConfirmationMail;
 use App\Mail\NewJobApplicationMail;
-use App\Models\Career as Job;
+use App\Models\Career;
 use App\Models\JobApplication;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
@@ -29,7 +29,7 @@ class JobApplicationController extends Controller
             ], 422);
         }
 
-        $job = Job::where('id', $jobId)
+        $job = Career::where('id', $jobId)
             ->where('is_published', true)
             ->first();
 
