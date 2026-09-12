@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\ContactEnquiryController;
 use App\Http\Controllers\CreatorController;
+use App\Http\Controllers\GrowthAuditController;
 use App\Http\Controllers\InstagramController;
 use App\Http\Controllers\JobApplicationController;
 use App\Http\Controllers\JobController;
@@ -57,20 +58,28 @@ Route::post('/contact-enquiry', [ContactEnquiryController::class, 'store']);
 Route::post('/jobs/{jobId}/apply', [JobApplicationController::class, 'store']);
 
 Route::prefix('admin')->middleware(['api'])->group(function () {
-// Route::prefix('admin')->middleware(['api', 'jwt.auth'])->group(function () {
+
+    // =========================
+    // JWT PROTECTED ADMIN APIs
+    // =========================
 
     Route::middleware('jwt.auth')->group(function () {
 
+        // Posts
         Route::post('/posts', [PostController::class, 'store']);
         Route::post('/posts/{id}', [PostController::class, 'update']);
         Route::delete('/posts/{id}', [PostController::class, 'destroy']);
         Route::patch('/posts/{id}/publish', [PostController::class, 'togglePublish']);
         Route::patch('/posts/{id}/featured', [PostController::class, 'toggleFeatured']);
+
+        // Creators
         Route::post('/creator', [CreatorController::class, 'store']);
         Route::post('/creator/update/{id}', [CreatorController::class, 'update']);
         Route::delete('/creator/{id}', [CreatorController::class, 'destroy']);
         Route::patch('/creator/toggle-publish/{id}', [CreatorController::class, 'togglePublish']);
         Route::patch('/creator/toggle-featured/{id}', [CreatorController::class, 'toggleFeatured']);
+
+        // Jobs
         Route::post('/jobs', [JobController::class, 'store']);
         Route::post('/jobs/{id}', [JobController::class, 'update']);
         Route::delete('/jobs/{id}', [JobController::class, 'destroy']);
@@ -79,15 +88,27 @@ Route::prefix('admin')->middleware(['api'])->group(function () {
 
     });
 
+    // =========================
+    // PUBLIC APIs
+    // =========================
+
+    // Posts
     Route::get('/posts', [PostController::class, 'index']);
     Route::get('/posts/{id}', [PostController::class, 'show']);
 
+    // Creators
     Route::get('/creators', [CreatorController::class, 'index']);
-
     Route::get('/creators/{id}', [CreatorController::class, 'show']);
 
-    Route::get('/job-applications', [JobApplicationController::class, 'index']);
+    // Jobs
     Route::get('/jobs', [JobController::class, 'index']);
     Route::get('/jobs/{id}', [JobController::class, 'show']);
+
+    // Job Applications
+    Route::get('/job-applications', [JobApplicationController::class, 'index']);
+
+    // Growth Audit
+    Route::post('/growth-audit', [GrowthAuditController::class, 'store']);
+    Route::get('/growth-audit', [GrowthAuditController::class, 'index']);
 
 });
