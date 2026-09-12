@@ -337,197 +337,312 @@ class CreatorController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function update(Request $request, $id)
-    {
-        $creator = Creator::where(
-            'id',
-            $id
-        )->first();
+   public function update(Request $request)
+{
+    /*
+    |--------------------------------------------------------------------------
+    | Validation
+    |--------------------------------------------------------------------------
+    */
 
-        if (! $creator) {
+    $validator = Validator::make($request->all(), [
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Creator profile not found.',
-            ], 404);
+        'display_name' => 'required|string|max:60',
+
+        'tagline' => 'required|string|max:80',
+
+        'bio' => 'required|string|max:600',
+
+        'locations' => 'required|array',
+        'locations.*' => 'string|max:100',
+
+        'categories' => 'required|array',
+        'categories.*' => 'string|max:100',
+
+        'languages' => 'required|array',
+        'languages.*' => 'string|max:100',
+
+        'services' => 'required|array',
+        'services.*' => 'string|max:100',
+
+        'platforms' => 'required|array',
+        'platforms.*' => 'string|max:100',
+
+        'social_links' => 'required|array',
+
+        'social_links.instagram' => 'required|string|max:1000',
+        'social_links.youtube' => 'nullable|string|max:1000',
+        'social_links.facebook' => 'nullable|string|max:1000',
+        'social_links.tiktok' => 'nullable|string|max:1000',
+        'social_links.pinterest' => 'nullable|string|max:1000',
+
+        'instagram_url' => 'required|url',
+
+        'profile_photo' => [
+            'nullable',
+            'image',
+            'mimes:jpg,jpeg,png,webp',
+            'max:4096',
+        ],
+
+        'portfolio_images' => 'nullable|array|max:10',
+
+        'portfolio_images.*' => [
+            'image',
+            'mimes:jpg,jpeg,png,webp',
+            'max:4096',
+        ],
+
+        'featured_reel_url' => 'nullable|url|max:1000',
+
+        'average_reach' => 'nullable|integer|min:0',
+
+        'show_follower_count' => 'nullable|boolean',
+
+        'show_average_reach' => 'nullable|boolean',
+
+        'show_enquiry_cta' => 'nullable|boolean',
+
+        'is_published' => 'nullable|boolean',
+
+        'is_featured' => 'nullable|boolean',
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Validation Error
+    |--------------------------------------------------------------------------
+    */
+
+    if ($validator->fails()) {
+
+        return response()->json([
+            'success' => false,
+            'errors' => $validator->errors()->first(),
+        ], 422);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Authenticated User
+    |--------------------------------------------------------------------------
+    */
+
+    $user = $request->user();
+
+    if (! $user) {
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Unauthenticated.',
+        ], 401);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Find Creator
+    |--------------------------------------------------------------------------
+    */
+
+    $creator = Creator::where(
+        'user_id',
+        $user->id
+    )->first();
+
+    if (! $creator) {
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Creator profile not found.',
+        ], 404);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Profile Photo
+    |--------------------------------------------------------------------------
+    */
+
+    if ($request->hasFile('profile_photo')) {
+
+        // Delete old profile photo
+        if (
+            $creator->profile_photo &&
+            \Storage::disk('public')->exists(
+                $creator->profile_photo
+            )
+        ) {
+            \Storage::disk('public')->delete(
+                $creator->profile_photo
+            );
         }
 
-        $validator = Validator::make($request->all(), [
+        $creator->profile_photo = $request
+            ->file('profile_photo')
+            ->store(
+                'creators/profile',
+                'public'
+            );
+    }
 
-            'display_name'           => 'required|string|max:60',
-            'tagline'                => 'required|string|max:80',
-            'bio'                    => 'required|string|max:600',
-            'location'               => 'required|array',
+    /*
+    |--------------------------------------------------------------------------
+    | Portfolio Images
+    |--------------------------------------------------------------------------
+    */
 
-            'categories'             => 'required|array',
-            'languages'              => 'required|array',
+    if ($request->hasFile('portfolio_images')) {
 
-            'services'               => 'required|string',
+        // Delete old portfolio images
+        if (is_array($creator->portfolio_images)) {
 
-            'platforms'              => 'required|array',
+            foreach ($creator->portfolio_images as $oldImage) {
 
-            'social_links'           => 'required|array',
-
-            'social_links.instagram' => 'required|url',
-            'social_links.youtube'   => 'required|url',
-            'social_links.facebook'  => 'required|url',
-            'social_links.tiktok'    => 'required|url',
-            'social_links.pinterest' => 'required|url',
-
-            'instagram_url'          => 'required|url',
-
-            'profile_photo'          => [
-                'nullable',
-                'image',
-                'mimes:jpg,jpeg,png,webp',
-                'max:4096',
-            ],
-
-            'portfolio_images'       => 'required|array|max:10',
-
-            'portfolio_images.*'     => [
-                'image',
-                'mimes:jpg,jpeg,png,webp',
-                'max:4096',
-            ],
-
-            'featured_reel_url'      => 'required|url|max:1000',
-
-            'follower_count'         => 'required|integer|min:0',
-            'average_reach'          => 'required|integer|min:0',
-
-            'show_follower_count'    => 'required|boolean',
-            'show_average_reach'     => 'required|boolean',
-            'show_enquiry_cta'       => 'required|boolean',
-
-            'is_published'           => 'required|boolean',
-            'is_featured'            => 'required|boolean',
-        ]);
-
-        if ($validator->fails()) {
-
-            return response()->json([
-                'success' => false,
-                'errors'  => $validator->errors()->first(),
-            ], 422);
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Profile photo
-        |--------------------------------------------------------------------------
-        */
-
-        if ($request->hasFile('profile_photo')) {
-
-            if (
-                $creator->profile_photo &&
-                Storage::disk('public')
-                ->exists($creator->profile_photo)
-            ) {
-                Storage::disk('public')
-                    ->delete($creator->profile_photo);
-            }
-
-            $creator->profile_photo =
-            $request->file('profile_photo')
-                ->store('creators/profile', 'public');
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Portfolio
-        |--------------------------------------------------------------------------
-        */
-
-        if ($request->hasFile('portfolio_images')) {
-
-            if ($creator->portfolio_images) {
-
-                foreach (
-                    $creator->portfolio_images as $oldImage
+                if (
+                    \Storage::disk('public')->exists(
+                        $oldImage
+                    )
                 ) {
-
-                    if (
-                        Storage::disk('public')
-                        ->exists($oldImage)
-                    ) {
-                        Storage::disk('public')
-                            ->delete($oldImage);
-                    }
+                    \Storage::disk('public')->delete(
+                        $oldImage
+                    );
                 }
             }
+        }
 
-            $portfolioImages = [];
+        $portfolioImages = [];
 
-            foreach (
-                $request->file('portfolio_images') as $image
-            ) {
+        foreach (
+            $request->file('portfolio_images') as $image
+        ) {
 
-                $portfolioImages[] =
-                $image->store(
+            $portfolioImages[] = $image
+                ->store(
                     'creators/portfolio',
                     'public'
                 );
-            }
-
-            $creator->portfolio_images = $portfolioImages;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Update fields
-        |--------------------------------------------------------------------------
-        */
+        $creator->portfolio_images = $portfolioImages;
+    }
 
-        $creator->display_name = $request->display_name;
-        $creator->tagline      = $request->tagline;
-        $creator->bio          = $request->bio;
-        $creator->location     = $request->location;
+    /*
+    |--------------------------------------------------------------------------
+    | Update Creator Details
+    |--------------------------------------------------------------------------
+    */
 
-        $creator->categories = $request->categories;
-        $creator->languages  = $request->languages;
+    $creator->display_name =
+        $request->display_name;
 
-        $creator->services = $request->services;
+    $creator->tagline =
+        $request->tagline;
 
-        $creator->platforms    = $request->platforms;
-        $creator->social_links = $request->social_links;
+    $creator->bio =
+        $request->bio;
 
-        $creator->instagram_url =
+    $creator->locations =
+        $request->locations;
+
+    $creator->categories =
+        $request->categories;
+
+    $creator->languages =
+        $request->languages;
+
+    $creator->services =
+        $request->services;
+
+    $creator->platforms =
+        $request->platforms;
+
+    $creator->social_links =
+        $request->social_links;
+
+    /*
+    |--------------------------------------------------------------------------
+    | Instagram
+    |--------------------------------------------------------------------------
+    */
+
+    $creator->instagram_url =
         $request->instagram_url;
 
-        $creator->featured_reel_url =
+    /*
+    |--------------------------------------------------------------------------
+    | Other Details
+    |--------------------------------------------------------------------------
+    */
+
+    $creator->featured_reel_url =
         $request->featured_reel_url;
 
-        $creator->follower_count =
-        $request->follower_count ?? 0;
-
-        $creator->average_reach =
+    $creator->average_reach =
         $request->average_reach ?? 0;
 
-        $creator->show_follower_count =
-        $request->boolean('show_follower_count');
+    /*
+    |--------------------------------------------------------------------------
+    | Visibility Settings
+    |--------------------------------------------------------------------------
+    */
 
-        $creator->show_average_reach =
-        $request->boolean('show_average_reach');
+    $creator->show_follower_count =
+        $request->boolean(
+            'show_follower_count'
+        );
 
-        $creator->show_enquiry_cta =
-        $request->boolean('show_enquiry_cta');
+    $creator->show_average_reach =
+        $request->boolean(
+            'show_average_reach'
+        );
 
-        $creator->is_published =
-        $request->boolean('is_published');
+    $creator->show_enquiry_cta =
+        $request->boolean(
+            'show_enquiry_cta'
+        );
 
-        $creator->is_featured =
-        $request->boolean('is_featured');
+    /*
+    |--------------------------------------------------------------------------
+    | Publish Settings
+    |--------------------------------------------------------------------------
+    */
 
-        $creator->save();
+    $creator->is_published =
+        $request->boolean(
+            'is_published'
+        );
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Creator profile updated successfully.',
-            'data'    => $this->formatCreator($creator),
-        ]);
-    }
+    $creator->is_featured =
+        $request->boolean(
+            'is_featured'
+        );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Save
+    |--------------------------------------------------------------------------
+    */
+
+    $creator->save();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Response
+    |--------------------------------------------------------------------------
+    */
+
+    return response()->json([
+
+        'success' => true,
+
+        'message' =>
+            'Creator profile updated successfully.',
+
+        'data' =>
+            $this->formatCreator($creator),
+
+    ], 200);
+}
 
     /*
     |--------------------------------------------------------------------------

@@ -1,8 +1,11 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\ContactEnquiryController;
 use App\Http\Controllers\CreatorController;
 use App\Http\Controllers\InstagramController;
+use App\Http\Controllers\JobApplicationController;
+use App\Http\Controllers\JobController;
 use App\Http\Controllers\PostController;
 
 Route::prefix('/public')->group(function () {
@@ -43,52 +46,35 @@ Route::prefix('auth')->group(function () {
 
 });
 
-Route::prefix('admin')->middleware(['api'])->group(function () {
-// Route::prefix('admin')->middleware(['api', 'jwt.auth'])->group(function () {
+Route::get('/list-jobs', [JobController::class, 'publicIndex']);
 
+Route::get('/jobs/departments', [JobController::class, 'publicDepartments']);
+Route::get('/jobs/types', [JobController::class, 'publicJobTypes']);
+Route::get('/jobs/{id}', [JobController::class, 'publicShow']);
+Route::post('/contact-enquiry', [ContactEnquiryController::class, 'store']);
+Route::post('/jobs/{jobId}/apply', [JobApplicationController::class, 'store']);
+
+// Route::prefix('admin')->middleware(['api'])->group(function () {
+Route::prefix('admin')->middleware(['api', 'jwt.auth'])->group(function () {
     Route::post('/posts', [PostController::class, 'store']);
-
     Route::get('/posts', [PostController::class, 'index']);
-
     Route::get('/posts/{id}', [PostController::class, 'show']);
-
     Route::post('/posts/{id}', [PostController::class, 'update']);
-
     Route::delete('/posts/{id}', [PostController::class, 'destroy']);
-
-    // Toggle APIs
     Route::patch('/posts/{id}/publish', [PostController::class, 'togglePublish']);
     Route::patch('/posts/{id}/featured', [PostController::class, 'toggleFeatured']);
-
-    Route::post(
-        '/creator',
-        [CreatorController::class, 'store']
-    );
-
-    Route::get(
-        '/creator/profile',
-        [CreatorController::class, 'profile']
-    );
-
-    Route::post(
-        '/creator/update/{id}',
-        [CreatorController::class, 'update']
-    );
-
-    Route::delete(
-        '/creator/{id}',
-        [CreatorController::class, 'destroy']
-    );
-
-    // Visibility
-    Route::patch(
-        '/creator/toggle-publish/{id}',
-        [CreatorController::class, 'togglePublish']
-    );
-
-    Route::patch(
-        '/creator/toggle-featured/{id}',
-        [CreatorController::class, 'toggleFeatured']
-    );
-
+    Route::post('/creator', [CreatorController::class, 'store']);
+    Route::get('/creator/profile', [CreatorController::class, 'profile']);
+    Route::post('/creator/update/{id}', [CreatorController::class, 'update']);
+    Route::delete('/creator/{id}', [CreatorController::class, 'destroy']);
+    Route::patch('/creator/toggle-publish/{id}', [CreatorController::class, 'togglePublish']);
+    Route::patch('/creator/toggle-featured/{id}', [CreatorController::class, 'toggleFeatured']);
+    Route::post('/jobs', [JobController::class, 'store']);
+    Route::get('/job-applications', [JobApplicationController::class, 'index']);
+    Route::get('/jobs', [JobController::class, 'index']);
+    Route::get('/jobs/{id}', [JobController::class, 'show']);
+    Route::post('/jobs/{id}', [JobController::class, 'update']);
+    Route::delete('/jobs/{id}', [JobController::class, 'destroy']);
+    Route::patch('/jobs/{id}/toggle-publish', [JobController::class, 'togglePublish']);
+    Route::patch('/jobs/{id}/toggle-featured', [JobController::class, 'toggleFeatured']);
 });

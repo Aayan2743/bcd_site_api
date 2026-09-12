@@ -107,4 +107,10 @@ class User extends Authenticatable implements JWTSubject
     {
         return $this->hasOne(Creator::class);
     }
+
+    public function jobs()
+    {
+        return $this->hasMany(Career::class);
+    }
+
 }
