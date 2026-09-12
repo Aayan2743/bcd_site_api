@@ -23,6 +23,7 @@ class Creator extends Model
         'profile_photo',
         'portfolio_images',
         'featured_reel_url',
+        'platform_stats',
 
         'follower_count',
         'average_reach',
@@ -41,6 +42,7 @@ class Creator extends Model
         'location'            => 'array',
         'languages'           => 'array',
         'services'            => 'array',
+        'platform_stats'      => 'array',
         'platforms'           => 'array',
         'social_links'        => 'array',
         'portfolio_images'    => 'array',
