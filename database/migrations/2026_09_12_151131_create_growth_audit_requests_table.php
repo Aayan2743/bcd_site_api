@@ -12,6 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('growth_audit_requests', function (Blueprint $table) {
+             $table->id();
              // First screen
             $table->string('business_type');
             $table->string('primary_goal');

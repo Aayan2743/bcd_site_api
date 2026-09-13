@@ -10,6 +10,7 @@ class Career extends Model
         'user_id',
 
         'job_title',
+        'slug',
         'department',
         'job_type',
         'location',

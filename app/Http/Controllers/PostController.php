@@ -5,6 +5,7 @@ use App\Models\Post;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class PostController extends Controller
 {
@@ -26,7 +27,7 @@ class PostController extends Controller
 
             'seo_title'        => 'nullable|string|max:255',
             'meta_description' => 'nullable|string',
-            'slug'             => 'required|string|max:255',
+            // 'slug'             => 'required|string|max:255',
             'key_phrases'      => 'nullable|string',
 
             'is_published'     => 'nullable|boolean',
@@ -54,6 +55,17 @@ class PostController extends Controller
                     'slug' => ['This slug is already in use.'],
                 ],
             ], 422);
+        }
+
+        $slug = Str::slug($request->title);
+
+// Make slug unique
+        $originalSlug = $slug;
+        $count        = 1;
+
+        while (Post::where('slug', $slug)->exists()) {
+            $slug = $originalSlug . '-' . $count;
+            $count++;
         }
         /*
         |--------------------------------------------------------------------------
@@ -87,7 +99,7 @@ class PostController extends Controller
 
             'seo_title'        => $request->seo_title,
             'meta_description' => $request->meta_description,
-            'slug'             => $request->slug,
+            'slug'             => $slug,
             'key_phrases'      => $request->key_phrases,
 
             'is_published'     => $request->boolean('is_published'),
@@ -157,7 +169,7 @@ class PostController extends Controller
     /**
      * Update Post
      */
-    public function update(Request $request, $id)
+    public function update1(Request $request, $id)
     {
         /*
     |--------------------------------------------------------------------------
@@ -194,7 +206,7 @@ class PostController extends Controller
             'seo_title'        => 'nullable|string|max:255',
             'meta_description' => 'nullable|string',
 
-            'slug'             => 'required|string|max:255',
+            // 'slug'             => 'required|string|max:255',
 
             'key_phrases'      => 'nullable|string',
 
@@ -231,6 +243,20 @@ class PostController extends Controller
             ], 422);
         }
 
+        $slug = Str::slug($request->title);
+
+        $originalSlug = $slug;
+        $count        = 1;
+
+        while (
+            Post::where('slug', $slug)
+            ->where('id', '!=', $post->id)
+            ->exists()
+        ) {
+            $slug = $originalSlug . '-' . $count;
+            $count++;
+        }
+
         /*
     |--------------------------------------------------------------------------
     | Cover Image
@@ -264,6 +290,7 @@ class PostController extends Controller
 
         $post->excerpt = $request->excerpt;
         $post->content = $request->content;
+        $post->slug    = $slug;
 
         $post->video_url = $request->video_url;
 
@@ -293,6 +320,138 @@ class PostController extends Controller
         ], 200);
     }
 
+
+
+    public function update(Request $request, $id)
+{
+    /*
+    |--------------------------------------------------------------------------
+    | Find Post
+    |--------------------------------------------------------------------------
+    */
+
+    $post = Post::find($id);
+
+    if (! $post) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Post not found.',
+        ], 404);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Validation
+    |--------------------------------------------------------------------------
+    */
+
+    $validator = Validator::make($request->all(), [
+        'title'            => 'required|string|max:255',
+        'category'         => 'required|string|max:255',
+        'published_date'   => 'required|date',
+
+        'excerpt'          => 'nullable|string',
+        'content'          => 'required|string',
+
+        'cover_image'      => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
+        'video_url'        => 'nullable|url|max:1000',
+
+        'seo_title'        => 'nullable|string|max:255',
+        'meta_description' => 'nullable|string',
+
+        'key_phrases'      => 'nullable|string',
+
+        'is_published'     => 'nullable|boolean',
+        'is_featured'      => 'nullable|boolean',
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json([
+            'success' => false,
+            'errors'  => $validator->errors()->first(),
+        ], 422);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Generate Slug From Title
+    |--------------------------------------------------------------------------
+    */
+
+    $slug = Str::slug($request->title);
+
+    $originalSlug = $slug;
+    $count = 1;
+
+    while (
+        Post::where('slug', $slug)
+            ->where('id', '!=', $post->id)
+            ->exists()
+    ) {
+        $slug = $originalSlug . '-' . $count;
+        $count++;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cover Image
+    |--------------------------------------------------------------------------
+    */
+
+    if ($request->hasFile('cover_image')) {
+
+        // Delete old image
+        if (
+            $post->cover_image &&
+            Storage::disk('public')->exists($post->cover_image)
+        ) {
+            Storage::disk('public')->delete($post->cover_image);
+        }
+
+        // Store new image
+        $post->cover_image = $request->file('cover_image')
+            ->store('posts', 'public');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Update Post
+    |--------------------------------------------------------------------------
+    */
+
+    $post->title          = $request->title;
+    $post->category       = $request->category;
+    $post->published_date = $request->published_date;
+
+    $post->excerpt = $request->excerpt;
+    $post->content = $request->content;
+
+    $post->slug = $slug;
+
+    $post->video_url = $request->video_url;
+
+    $post->seo_title        = $request->seo_title;
+    $post->meta_description = $request->meta_description;
+
+    $post->key_phrases = $request->key_phrases;
+
+    $post->is_published = $request->boolean('is_published');
+    $post->is_featured  = $request->boolean('is_featured');
+
+    $post->save();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Response
+    |--------------------------------------------------------------------------
+    */
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Post updated successfully.',
+        'data'    => $post,
+    ], 200);
+}
     /**
      * Delete Post
      */

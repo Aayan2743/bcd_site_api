@@ -24,6 +24,7 @@ class Creator extends Model
         'portfolio_images',
         'featured_reel_url',
         'platform_stats',
+        'slug',
 
         'follower_count',
         'average_reach',

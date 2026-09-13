@@ -5,6 +5,7 @@ use App\Models\Creator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class CreatorController extends Controller
 {
@@ -155,12 +156,22 @@ class CreatorController extends Controller
             }
         }
 
+        $slug = Str::slug($request->display_name);
+
+        $originalSlug = $slug;
+        $count        = 1;
+
+        while (Creator::where('slug', $slug)->exists()) {
+            $slug = $originalSlug . '-' . $count;
+            $count++;
+        }
+
         $creator = Creator::create([
 
             'user_id'             => $user->id,
 
             'display_name'        => $request->display_name,
-
+            'slug'                => $slug,
             'tagline'             => $request->tagline,
 
             'bio'                 => $request->bio,
@@ -287,214 +298,249 @@ class CreatorController extends Controller
     |--------------------------------------------------------------------------
     */
 
-   public function update(Request $request, $id)
-{
-    $creator = Creator::find($id);
+    public function update(Request $request, $id)
+    {
+        $creator = Creator::find($id);
 
-    if (! $creator) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Creator not found.',
-        ], 404);
-    }
-
-    $validator = Validator::make($request->all(), [
-
-        'display_name' => 'required|string|max:60',
-
-        'tagline' => 'required|string|max:80',
-
-        'bio' => 'required|string|max:600',
-
-        'location' => 'required|array',
-        'location.*' => 'required|string|max:100',
-
-        'categories' => 'required|array',
-        'categories.*' => 'required|string|max:100',
-
-        'languages' => 'required|array',
-        'languages.*' => 'required|string|max:100',
-
-        'services' => 'required|string',
-
-        'platforms' => 'required|array',
-        'platforms.*' => 'required|string|max:100',
-
-        'platform_stats' => 'nullable|array',
-
-        'platform_stats.instagram' => 'nullable|array',
-        'platform_stats.instagram.followers' => 'nullable|integer|min:0',
-        'platform_stats.instagram.following' => 'nullable|integer|min:0',
-
-        'platform_stats.youtube' => 'nullable|array',
-        'platform_stats.youtube.followers' => 'nullable|integer|min:0',
-        'platform_stats.youtube.following' => 'nullable|integer|min:0',
-
-        'social_links' => 'nullable|array',
-
-        'social_links.instagram' => 'nullable|string|max:1000',
-        'social_links.youtube' => 'nullable|string|max:1000',
-        'social_links.facebook' => 'nullable|string|max:1000',
-        'social_links.tiktok' => 'nullable|string|max:1000',
-        'social_links.pinterest' => 'nullable|string|max:1000',
-
-        'instagram_url' => 'required|url|max:1000',
-
-        'profile_photo' => [
-            'nullable',
-            'image',
-            'mimes:jpg,jpeg,png,webp',
-            'max:4096',
-        ],
-
-        'portfolio_images' => 'nullable|array|max:10',
-
-        'portfolio_images.*' => [
-            'image',
-            'mimes:jpg,jpeg,png,webp',
-            'max:4096',
-        ],
-
-        'featured_reel_url' => 'nullable|url|max:1000',
-
-        'follower_count' => 'nullable|integer|min:0',
-
-        'average_reach' => 'nullable|integer|min:0',
-
-        'show_follower_count' => 'nullable|boolean',
-
-        'show_average_reach' => 'nullable|boolean',
-
-        'show_enquiry_cta' => 'nullable|boolean',
-
-        'is_published' => 'nullable|boolean',
-
-        'is_featured' => 'nullable|boolean',
-    ]);
-
-    if ($validator->fails()) {
-        return response()->json([
-            'success' => false,
-            'errors' => $validator->errors()->first(),
-        ], 422);
-    }
-
-    $platforms = $request->platforms ?? [];
-
-    $platformStats = $request->platform_stats ?? [];
-
-    foreach ($platformStats as $platform => $stats) {
-
-        $selectedPlatform = collect($platforms)
-            ->map(fn ($item) => strtolower(trim($item)))
-            ->contains(strtolower($platform));
-
-        if (! $selectedPlatform) {
+        if (! $creator) {
             return response()->json([
                 'success' => false,
-                'message' => ucfirst($platform) . ' is not selected in platforms.',
+                'message' => 'Creator not found.',
+            ], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+
+            'display_name'                       => 'required|string|max:60',
+
+            'tagline'                            => 'required|string|max:80',
+
+            'bio'                                => 'required|string|max:600',
+
+            'location'                           => 'required|array',
+            'location.*'                         => 'required|string|max:100',
+
+            'categories'                         => 'required|array',
+            'categories.*'                       => 'required|string|max:100',
+
+            'languages'                          => 'required|array',
+            'languages.*'                        => 'required|string|max:100',
+
+            'services'                           => 'required|string',
+
+            'platforms'                          => 'required|array',
+            'platforms.*'                        => 'required|string|max:100',
+
+            'platform_stats'                     => 'nullable|array',
+
+            'platform_stats.instagram'           => 'nullable|array',
+            'platform_stats.instagram.followers' => 'nullable|integer|min:0',
+            'platform_stats.instagram.following' => 'nullable|integer|min:0',
+
+            'platform_stats.youtube'             => 'nullable|array',
+            'platform_stats.youtube.followers'   => 'nullable|integer|min:0',
+            'platform_stats.youtube.following'   => 'nullable|integer|min:0',
+
+            'social_links'                       => 'nullable|array',
+
+            'social_links.instagram'             => 'nullable|string|max:1000',
+            'social_links.youtube'               => 'nullable|string|max:1000',
+            'social_links.facebook'              => 'nullable|string|max:1000',
+            'social_links.tiktok'                => 'nullable|string|max:1000',
+            'social_links.pinterest'             => 'nullable|string|max:1000',
+
+            'instagram_url'                      => 'required|url|max:1000',
+
+            'profile_photo'                      => [
+                'nullable',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:4096',
+            ],
+
+            'portfolio_images'                   => 'nullable|array|max:10',
+
+            'portfolio_images.*'                 => [
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:4096',
+            ],
+
+            'featured_reel_url'                  => 'nullable|url|max:1000',
+
+            'follower_count'                     => 'nullable|integer|min:0',
+
+            'average_reach'                      => 'nullable|integer|min:0',
+
+            'show_follower_count'                => 'nullable|boolean',
+
+            'show_average_reach'                 => 'nullable|boolean',
+
+            'show_enquiry_cta'                   => 'nullable|boolean',
+
+            'is_published'                       => 'nullable|boolean',
+
+            'is_featured'                        => 'nullable|boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors'  => $validator->errors()->first(),
             ], 422);
         }
-    }
 
-    $services = array_values(
-        array_filter(
-            array_map(
-                'trim',
-                preg_split(
-                    '/\r\n|\r|\n/',
-                    $request->services
+        $platforms = $request->platforms ?? [];
+
+        $platformStats = $request->platform_stats ?? [];
+
+        foreach ($platformStats as $platform => $stats) {
+
+            $selectedPlatform = collect($platforms)
+                ->map(fn($item) => strtolower(trim($item)))
+                ->contains(strtolower($platform));
+
+            if (! $selectedPlatform) {
+                return response()->json([
+                    'success' => false,
+                    'message' => ucfirst($platform) . ' is not selected in platforms.',
+                ], 422);
+            }
+        }
+
+        $services = array_values(
+            array_filter(
+                array_map(
+                    'trim',
+                    preg_split(
+                        '/\r\n|\r|\n/',
+                        $request->services
+                    )
                 )
             )
-        )
-    );
+        );
 
-    $profilePhoto = $creator->profile_photo;
+        $profilePhoto = $creator->profile_photo;
 
-    if ($request->hasFile('profile_photo')) {
+        if ($request->hasFile('profile_photo')) {
 
-        $profilePhoto = $request
-            ->file('profile_photo')
-            ->store(
-                'creators/profile',
-                'public'
-            );
-    }
-
-    $portfolioImages = $creator->portfolio_images ?? [];
-
-    if ($request->hasFile('portfolio_images')) {
-
-        $portfolioImages = [];
-
-        foreach ($request->file('portfolio_images') as $image) {
-
-            $portfolioImages[] = $image
+            $profilePhoto = $request
+                ->file('profile_photo')
                 ->store(
-                    'creators/portfolio',
+                    'creators/profile',
                     'public'
                 );
         }
-    }
 
-    $creator->update([
+        $portfolioImages = $creator->portfolio_images ?? [];
 
-        'display_name' => $request->display_name,
+        if ($request->hasFile('portfolio_images')) {
 
-        'tagline' => $request->tagline,
+            $portfolioImages = [];
 
-        'bio' => $request->bio,
+            foreach ($request->file('portfolio_images') as $image) {
 
-        'location' => $request->location,
+                $portfolioImages[] = $image
+                    ->store(
+                        'creators/portfolio',
+                        'public'
+                    );
+            }
+        }
 
-        'categories' => $request->categories,
+        $slug = $creator->slug;
 
-        'languages' => $request->languages,
+        if ($creator->display_name !== $request->display_name) {
+            $slug = Str::slug($request->display_name);
 
-        'services' => $services,
+            $originalSlug = $slug;
+            $count        = 1;
 
-        'platforms' => $platforms,
+            while (
+                Creator::where('slug', $slug)
+                ->where('id', '!=', $creator->id)
+                ->exists()
+            ) {
+                $slug = $originalSlug . '-' . $count;
+                $count++;
+            }
+        }
 
-        'platform_stats' => $platformStats,
+        if (empty($slug)) {
+            $slug = Str::slug($request->display_name);
 
-        'social_links' => $request->social_links ?? [],
+            $originalSlug = $slug;
+            $count        = 1;
 
-        'instagram_url' => $request->instagram_url,
+            while (
+                Creator::where('slug', $slug)
+                ->where('id', '!=', $creator->id)
+                ->exists()
+            ) {
+                $slug = $originalSlug . '-' . $count;
+                $count++;
+            }
+        }
 
-        'profile_photo' => $profilePhoto,
+        $creator->update([
 
-        'portfolio_images' => $portfolioImages,
+            'display_name'        => $request->display_name,
+            'slug'                => $slug,
 
-        'featured_reel_url' => $request->featured_reel_url,
+            'tagline'             => $request->tagline,
 
-        'follower_count' => $request->follower_count ?? 0,
+            'bio'                 => $request->bio,
 
-        'average_reach' => $request->average_reach ?? 0,
+            'location'            => $request->location,
 
-        'show_follower_count' =>
+            'categories'          => $request->categories,
+
+            'languages'           => $request->languages,
+
+            'services'            => $services,
+
+            'platforms'           => $platforms,
+
+            'platform_stats'      => $platformStats,
+
+            'social_links'        => $request->social_links ?? [],
+
+            'instagram_url'       => $request->instagram_url,
+
+            'profile_photo'       => $profilePhoto,
+
+            'portfolio_images'    => $portfolioImages,
+
+            'featured_reel_url'   => $request->featured_reel_url,
+
+            'follower_count'      => $request->follower_count ?? 0,
+
+            'average_reach'       => $request->average_reach ?? 0,
+
+            'show_follower_count' =>
             $request->boolean('show_follower_count'),
 
-        'show_average_reach' =>
+            'show_average_reach'  =>
             $request->boolean('show_average_reach'),
 
-        'show_enquiry_cta' =>
+            'show_enquiry_cta'    =>
             $request->boolean('show_enquiry_cta'),
 
-        'is_published' =>
+            'is_published'        =>
             $request->boolean('is_published'),
 
-        'is_featured' =>
+            'is_featured'         =>
             $request->boolean('is_featured'),
-    ]);
+        ]);
 
-    $creator->refresh();
+        $creator->refresh();
 
-    return response()->json([
-        'success' => true,
-        'message' => 'Creator profile updated successfully.',
-        'data' => $this->formatCreator($creator),
-    ], 200);
-}
+        return response()->json([
+            'success' => true,
+            'message' => 'Creator profile updated successfully.',
+            'data'    => $this->formatCreator($creator),
+        ], 200);
+    }
 
     /*
     |--------------------------------------------------------------------------
